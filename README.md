@@ -2,9 +2,10 @@
 
 > **Portfolio project \| SQL · Power BI · Python · Statistics**
 >
-> **Status:** Analysis and documentation are being finalized. Reported
-> figures below must be reconciled across SQL, Python, and Power BI
-> before this README is treated as a final validated release.
+> **Status:** Dashboard and core analyses are built. Payment `Paid_Amount`
+> values were normalized in a separate synthetic-data file and reconciled
+> to claim-level paid totals for claims with payment records. See the
+> payment normalization note and limitations below.
 
 ## 1. Project overview
 
@@ -209,29 +210,59 @@ reason to review against the affected claim details and applicable payer
 requirements. The appropriate correction must be determined case by
 case.
 
-## 7. Payment-record investigation
+## 7. Payment-record investigation and normalization
 
-The reported payment coverage check found:
+The original payment file contained **81,178 payment rows** across
+**42,920 distinct claims**. Another **7,080 claims** had no matching
+payment record.
 
--   **42,920** distinct claims with a payment record.
--   **7,080** distinct claims without a payment record.
+### Reconciliation issue identified
 
-A payment record does **not** prove that a claim was fully paid or
-partially paid. To assess the remaining balance, compare claim-level
-billed, allowed, paid, adjustment, and outstanding amounts using the
-project's validated financial definitions. Also account for the
-possibility of multiple payment transactions per claim.
+The sum of the original payment `Paid_Amount` rows did not reconcile
+with claim-level `Paid_Amount` for most claims. For example, some claims'
+payment-row totals were lower than the claim-level amount, while others
+were higher. Therefore, the original payment records could not be used
+as independent confirmation of claim-level paid amounts.
 
-For 120+ day non-denial AR, the reported split was:
+### Synthetic-data normalization performed
+
+A separate file, `fact_payments_corrected.csv`, was created. Within each
+claim with payment records, the original payment `Paid_Amount` values
+were proportionally allocated so that their sum equals that claim's
+claim-level `Paid_Amount`, using cent-level rounding. The original
+payment values are retained in the separate `Original_Paid_Amount`
+column for traceability.
+
+Validation of the normalized file found:
+
+- **81,178** payment rows retained.
+- **42,920** distinct claims with payment records retained.
+- **42,920 of 42,920** claims with payment records reconcile to the
+  claim-level `Paid_Amount` to the cent.
+- **0** remaining claim-level paid-total mismatches among claims with
+  payment records.
+- Claim-level paid total for the covered claims: **$18,065,845.85**.
+- Normalized payment paid total for the same claims: **$18,065,845.85**.
+
+**Important limitation:** This is a normalization of synthetic portfolio
+data, not recovery of genuine transaction history. It verifies the
+claim-level sum of `Paid_Amount` only. It does not establish the accuracy
+of individual payment transactions, service-line allocation,
+`Allowed_Amount`, `Adjustment_Amount`, payment status, or payment dates.
+The original payment CSV should be retained separately; use the
+normalized file only where the project explicitly calls for this
+reconciled synthetic view.
+
+The dashboard's reported 120+ day non-denial AR split is:
 
   Group                           Reported AR
   ------------------------- -----------------
-  With payment records        \$17,231,629.09
-  Without payment records      \$2,919,479.40
-  Total                       \$20,151,108.49
+  With payment records        $17,231,629.09
+  Without payment records      $2,919,479.40
+  Total                       $20,151,108.49
 
-These values should be reconfirmed against the final query and data
-model before publication.
+These AR category amounts describe claim-level AR grouped by payment
+record presence; they are not the sum of payment transactions.
 
 ## 8. Statistics and outlier screening
 
@@ -276,8 +307,12 @@ definitively caused AR to accumulate.
     balance.
 -   A claim's absence from the denial dataset means only that no
     matching record was found in that dataset.
--   A payment record does not establish full or partial payment without
-    amount-level reconciliation.
+-   The normalized payment file reconciles summed `Paid_Amount` to the
+    claim-level amount for claims with payment records, but this is a
+    synthetic-data normalization and not validation of authentic
+    transaction history.
+-   `Allowed_Amount` and `Adjustment_Amount` were not independently
+    reconciled by the payment normalization step.
 -   To claim that AR **increased over time**, compare consistent AR
     measures across multiple time periods. A large aging bucket alone
     shows concentration, not a trend.
@@ -347,7 +382,8 @@ and honest limitations---not the number of queries or functions used.
 
 ------------------------------------------------------------------------
 
-**Publication status:** Working draft. Complete the final
-SQL/Python/Power BI reconciliation, verify definitions and source files,
-and review privacy before treating this README as final.
-
+**Publication status:** Payment `Paid_Amount` normalization has been
+validated at claim level. Before describing the project as fully
+cross-tool reconciled, verify the remaining headline KPIs against the
+final SQL, Python, and Power BI outputs and review all public files for
+synthetic-data consistency and privacy.
